@@ -149,6 +149,34 @@ services:
       retries: 20
       start_period: 90s
 
+# Schema Registry - отдельный сервис
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.4.0
+    container_name: schema-registry
+    hostname: schema-registry
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka-1:9092,PLAINTEXT://kafka-2:9092,PLAINTEXT://kafka-3:9092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_DEBUG: 'true'
+      # Для Avro
+      SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL: BACKWARD
+      # без SSL
+      SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL: PLAINTEXT
+    ports:
+      - "8081:8081"
+    networks:
+      - kafka-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/subjects"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
@@ -158,6 +186,11 @@ services:
       KAFKA_CLUSTERS_0_NAME: test-kraft-cluster
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:9092,kafka-2:9092,kafka-3:9092
       KAFKA_CLUSTERS_0_READONLY: "false"
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
+      
+      # включаем просмотр схем
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY_READONLY: "false"
+      
     networks:
       - kafka-net
     depends_on:
@@ -166,6 +199,8 @@ services:
       kafka-2:
         condition: service_healthy  
       kafka-3:
+        condition: service_healthy
+      schema-registry:
         condition: service_healthy
 
 volumes:
