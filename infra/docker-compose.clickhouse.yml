@@ -1,0 +1,75 @@
+x-clickhouse-commons: &x-clickhouse-commons
+  image: clickhouse/clickhouse-server:25.1.2.3
+  environment:
+    - CLICKHOUSE_DB=default
+    - CLICKHOUSE_USER=default
+    - CLICKHOUSE_PASSWORD=default
+    - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+  networks:
+    - sharded_cluster_net
+
+services:
+  clickhouse-keeper:
+    image: clickhouse/clickhouse-keeper:24.9
+    hostname: clickhouse-keeper
+    ports:
+      - "2181:2181"  # Порт для совместимости с ZooKeeper-клиентами
+      - "9181:9181"  # HTTP-интерфейс Keeper
+      - "9234:9234"  # Порт для внутреннего общения Keeper
+    volumes:
+      - keeper_data:/var/lib/clickhouse-keeper
+      - ./ch-configs/keeper.xml:/etc/clickhouse-server/config.d/keeper.xml:ro  
+    networks:
+      - sharded_cluster_net
+
+  clickhouse-node1:
+    hostname: clickhouse-node1
+    depends_on:
+      - clickhouse-keeper
+    ports:
+      - "8123:8123"  # HTTP интерфейс
+      - "9000:9000"  # Native protocol
+    volumes:
+      - clickhouse_data1:/var/lib/clickhouse
+      - ./ch-configs/users.d/:/etc/clickhouse-server/users.d/
+      - ./ch-configs/config.d/:/etc/clickhouse-server/config.d/
+      - ./ch-configs/macros1.xml:/etc/clickhouse-server/config.d/macros.xml:rw
+    <<: *x-clickhouse-commons
+
+  clickhouse-node2:
+    hostname: clickhouse-node2
+    depends_on:
+      - clickhouse-keeper
+    ports:
+      - "8124:8123"  # HTTP интерфейс
+      - "9001:9000"  # Native protocol
+    volumes:
+      - clickhouse_data2:/var/lib/clickhouse
+      - ./ch-configs/users.d/:/etc/clickhouse-server/users.d/
+      - ./ch-configs/config.d/:/etc/clickhouse-server/config.d/
+      - ./ch-configs/macros2.xml:/etc/clickhouse-server/config.d/macros.xml:rw
+    <<: *x-clickhouse-commons
+
+  clickhouse-node3:
+    hostname: clickhouse-node3
+    depends_on:
+      - clickhouse-keeper
+    ports:
+      - "8125:8123"  # HTTP интерфейс
+      - "9002:9000"  # Native protocol
+    volumes:
+      - clickhouse_data3:/var/lib/clickhouse
+      - ./ch-configs/users.d/:/etc/clickhouse-server/users.d/
+      - ./ch-configs/config.d/:/etc/clickhouse-server/config.d/
+      - ./ch-configs/macros3.xml:/etc/clickhouse-server/config.d/macros.xml:rw
+    <<: *x-clickhouse-commons
+
+volumes:
+  clickhouse_data1: 
+  clickhouse_data2:
+  clickhouse_data3:
+  keeper_data:
+
+networks:
+  sharded_cluster_net:
+    driver: bridge
